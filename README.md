@@ -15,10 +15,11 @@
 提示词（prompts/*.json）
   → Lux3D text-to-3d（G1-Turbo · 20000 面 · PBR · GLB）   tools/lux3d.py
   → 瘦身：贴图缩到 512、按需减面                           tools/shrink_glb.sh（gltf-transform）
+  → 压缩：贴图转 WebP、网格 meshopt 压缩                    gltf-transform webp / meshopt
   → three.js 场景：摆位、碰撞、座位点、交互               game.js
 ```
 
-提示词统一写成 “cozy stylized cartoon game asset, soft rounded shapes, warm hand-painted colors… single object, no floor, no background”，保证 17 件家具风格一致、可以直接摆进同一个场景。原始模型合计约 150 MB，瘦身后约 24 MB，手机也能打开。
+提示词统一写成 “cozy stylized cartoon game asset, soft rounded shapes, warm hand-painted colors… single object, no floor, no background”，保证 17 件家具风格一致、可以直接摆进同一个场景。原始模型合计约 150 MB，瘦身、压缩后约 4 MB。网页版先下壁炉、沙发等 6 件核心家具（约 1 MB）就开门，其余家具进屋后下完一件摆一件。
 
 ## 玩法
 

@@ -16,7 +16,8 @@ gltf = (T / "GLTFLoader.js").read_text().replace("'../utils/BufferGeometryUtils.
 imap = {"imports": {"three": durl((T / "three.module.js").read_text()),
                     "three/addons/loaders/GLTFLoader.js": durl(gltf),
                     "three/addons/controls/OrbitControls.js": durl((T / "OrbitControls.js").read_text()),
-                    "three/addons/utils/BufferGeometryUtils.js": durl((T / "BufferGeometryUtils.js").read_text())}}
+                    "three/addons/utils/BufferGeometryUtils.js": durl((T / "BufferGeometryUtils.js").read_text()),
+                    "three/addons/libs/meshopt_decoder.module.js": durl((T / "meshopt_decoder.module.js").read_text())}}
 
 # 家具：Aholo Lux3D 文生 3D，经 tools/shrink_glb.sh 瘦身
 M = {p.stem: base64.b64encode(p.read_bytes()).decode() for p in sorted((MODELS / "props").glob("*.glb"))}

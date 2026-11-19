@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 function showErr(m) {
@@ -13,10 +14,10 @@ function showErr(m) {
 window.onerror = (m) => showErr(m);
 addEventListener("unhandledrejection", (e) => showErr(e.reason?.message || e.reason));
 setTimeout(() => {
-  if (!window.READY) {
+  if (!window.DOOR_OPEN) {
     const ld = document.getElementById("load");
     if (ld && !/卡住/.test(ld.textContent))
-      ld.textContent = modelsTotal ? `还在推门……（${modelsDone}/${modelsTotal}，第一次要下 28MB，以后就快了）` : "还在推门……（小屋有 30MB，网慢会久一点）";
+      ld.textContent = modelsTotal ? `还在推门……（${coreDone}/${CORE.length}，第一次要下 1MB 多，以后就快了）` : "还在推门……（小屋有 30MB，网慢会久一点）";
   }
 }, 15000);
 var R = new THREE.WebGLRenderer({ antialias: true });
@@ -420,6 +421,7 @@ scene.add(lampLight);
 var fill = new THREE.DirectionalLight(16773344, 0.7);
 world.add(fill, fill.target);
 var loader = new GLTFLoader;
+loader.setMeshoptDecoder(MeshoptDecoder);
 var MODEL_URLS = window.MODEL_URLS || {};
 var modelBufs = {};
 var modelsDone = 0;
@@ -478,13 +480,22 @@ async function fetchBuf(u, tries = 4) {
   }
   return null;
 }
-for (const [k, u] of Object.entries(MODEL_URLS))
-  modelBufs[k] = fetchBuf(u).finally(() => {
-    modelsDone++;
-    const ld = document.getElementById("load");
-    if (ld && !window.READY && !/卡住/.test(ld.textContent))
-      ld.textContent = `推门进小屋……（${modelsDone}/${modelsTotal}）`;
-  });
+var CORE = ["sofa", "fireplace", "bookshelf", "lamp", "table", "bed"].filter((k) => MODEL_URLS[k]);
+var coreDone = 0;
+var fetchOne = (k) => fetchBuf(MODEL_URLS[k]).finally(() => {
+  modelsDone++;
+  if (CORE.includes(k))
+    coreDone++;
+  const ld = document.getElementById("load");
+  if (ld && !window.DOOR_OPEN && !/卡住/.test(ld.textContent))
+    ld.textContent = `推门进小屋……（${coreDone}/${CORE.length}）`;
+});
+for (const k of CORE)
+  modelBufs[k] = fetchOne(k);
+var coreFetched = Promise.all(CORE.map((k) => modelBufs[k]));
+for (const k of Object.keys(MODEL_URLS))
+  if (!CORE.includes(k))
+    modelBufs[k] = coreFetched.then(() => fetchOne(k));
 function loadModel(key) {
   return new Promise(async (res) => {
     let buf = null;
@@ -583,7 +594,7 @@ var PIX_ICON = {
   "❄": ["#...#...#", ".#..#..#.", "..#.#.#..", "...###...", "#########", "...###...", "..#.#.#..", ".#..#..#.", "#...#...#"]
 };
 try {
-  await document.fonts.load('12px "FusionPixel"', "咕");
+  await Promise.race([document.fonts.load('12px "FusionPixel"', "咕"), new Promise((r) => setTimeout(r, 1500))]);
 } catch (e) {}
 function pixelMask(txt) {
   const icon = PIX_ICON[txt];
@@ -3759,47 +3770,6 @@ document.getElementById("note").textContent = "喵喵章鱼打盹＝Agent 这会
     props.bed = place(bed, { w: 2, x: 2.2, z: -1.95, ry: 0 });
   fire.position.set(-ROOM / 2 + 0.6, 0.55, 0.2);
   asciiFire.place(-ROOM / 2 + 0.6, 0.53, 0.2);
-  const more = await Promise.all(["tv", "computer", "beanbag", "beanbag2", "record", "plant", "catbed"].map(loadModel));
-  const [tv, pc, bb1, bb2, rec, plant, catbed] = more;
-  if (tv)
-    props.tv = place(tv, { w: 0.95, x: -ROOM / 2 + 0.35, z: -1.75, ry: Math.PI / 2 });
-  if (pc) {
-    props.pc = place(pc, { w: 1, x: -0.35, z: -ROOM / 2 + 0.38, ry: 0 });
-    props.pc.position.y = -PC_SINK;
-    pcScreen.position.set(PC_SCREEN.x, PC_SCREEN.y - PC_SINK, PC_SCREEN.z);
-    scene.add(pcScreen);
-    pcGlow.position.set(PC_SCREEN.x, PC_SCREEN.y - PC_SINK - 0.1, PC_SCREEN.z + 0.4);
-    scene.add(pcGlow);
-  }
-  if (bb1)
-    props.beanbag = place(bb1, { w: 0.8, x: 0.5, z: 1.75, ry: -1.94 });
-  if (bb2)
-    props.beanbag2 = place(bb2, { w: 0.75, x: -0.55, z: 2.45, ry: 2.99 });
-  if (rec)
-    props.record = place(rec, { w: 0.75, x: -ROOM / 2 + 0.5, z: 1.75, ry: Math.PI / 2 });
-  if (plant)
-    props.plant = place(plant, { h: 1.1, x: -2.55, z: 2.6, ry: 0 });
-  if (catbed)
-    props.catbed = place(catbed, { w: 0.6, x: -1.75, z: 1.35, ry: 0 });
-  addSeat("beanbag", { f: 0.38, back: 0.05 });
-  addSeat("beanbag2", { f: 0.38, back: 0.05 });
-  addSeat("sofa", { f: 0.42, back: 0.06, wide: 0.2 });
-  addSeat("bed", { f: 0.5, back: 0, sleep: true, approach: 0.75, wide: 0.35 });
-  addSeat("catbed", { f: 0.2, sleep: true, approach: 0.5 });
-  placeNewFurniture(await Promise.all(["cuckoo", "telescope", "armchair", "typewriter"].map(loadModel)));
-  for (const o of [...more, sofa, fp, shelf, lamp, table, bed])
-    if (o)
-      o.traverse((n) => {
-        if (n.isMesh && n.material) {
-          n.material.metalness = Math.min(n.material.metalness ?? 0, 0.15);
-          n.material.needsUpdate = true;
-        }
-      });
-  if (location.hash.includes("debug"))
-    document.getElementById("note").textContent = "sky:" + Array.from(skyCanvas.getContext("2d").getImageData(128, 100, 1, 1).data) + " " + Object.entries(props).map(([k, v]) => {
-      const b = new THREE.Box3().setFromObject(v);
-      return k + ":" + b.min.toArray().map((n) => n.toFixed(1)) + "~" + b.max.toArray().map((n) => n.toFixed(1));
-    }).join("  ");
   lampLight.position.set(-2.5, 1.7, -2.45);
   for (const o of [c, m])
     if (o)
@@ -3819,6 +3789,14 @@ document.getElementById("note").textContent = "喵喵章鱼打盹＝Agent 这会
             col.needsUpdate = true;
             n.userData.lin = 1;
           }
+        }
+      });
+  for (const o of [sofa, fp, shelf, lamp, table, bed])
+    if (o)
+      o.traverse((n) => {
+        if (n.isMesh && n.material) {
+          n.material.metalness = Math.min(n.material.metalness ?? 0, 0.15);
+          n.material.needsUpdate = true;
         }
       });
   clawd = new Critter(place(buildMew(), { w: 0.397, x: SPOTS.fire.x + 0.2, z: SPOTS.fire.z + 0.5, ry: -Math.PI / 2 }), "clawd");
@@ -3841,6 +3819,74 @@ document.getElementById("note").textContent = "喵喵章鱼打盹＝Agent 这会
       removeEventListener("pointerdown", first, true);
       syncShipBgm();
     }, true);
+  {
+    const ld = document.getElementById("load");
+    if (location.hash.includes("shot"))
+      ld.remove();
+    else {
+      ld.style.opacity = 0;
+      setTimeout(() => ld.remove(), 1100);
+    }
+    window.DOOR_OPEN = 1;
+  }
+  addSeat("sofa", { f: 0.42, back: 0.06, wide: 0.2 });
+  addSeat("bed", { f: 0.5, back: 0, sleep: true, approach: 0.75, wide: 0.35 });
+  const tame = (o, cap) => o.traverse((n) => {
+    if (n.isMesh && n.material) {
+      n.material.metalness = Math.min(n.material.metalness ?? 0, cap);
+      n.material.needsUpdate = true;
+    }
+  });
+  const LATER = {
+    tv: (o) => {
+      props.tv = place(o, { w: 0.95, x: -ROOM / 2 + 0.35, z: -1.75, ry: Math.PI / 2 });
+    },
+    computer: (o) => {
+      props.pc = place(o, { w: 1, x: -0.35, z: -ROOM / 2 + 0.38, ry: 0 });
+      props.pc.position.y = -PC_SINK;
+      pcScreen.position.set(PC_SCREEN.x, PC_SCREEN.y - PC_SINK, PC_SCREEN.z);
+      scene.add(pcScreen);
+      pcGlow.position.set(PC_SCREEN.x, PC_SCREEN.y - PC_SINK - 0.1, PC_SCREEN.z + 0.4);
+      scene.add(pcGlow);
+    },
+    beanbag: (o) => {
+      props.beanbag = place(o, { w: 0.8, x: 0.5, z: 1.75, ry: -1.94 });
+      addSeat("beanbag", { f: 0.38, back: 0.05 });
+    },
+    beanbag2: (o) => {
+      props.beanbag2 = place(o, { w: 0.75, x: -0.55, z: 2.45, ry: 2.99 });
+      addSeat("beanbag2", { f: 0.38, back: 0.05 });
+    },
+    record: (o) => {
+      props.record = place(o, { w: 0.75, x: -ROOM / 2 + 0.5, z: 1.75, ry: Math.PI / 2 });
+    },
+    plant: (o) => {
+      props.plant = place(o, { h: 1.1, x: -2.55, z: 2.6, ry: 0 });
+    },
+    catbed: (o) => {
+      props.catbed = place(o, { w: 0.6, x: -1.75, z: 1.35, ry: 0 });
+      addSeat("catbed", { f: 0.2, sleep: true, approach: 0.5 });
+    },
+    cuckoo: (o) => placeNewFurniture([o, null, null, null]),
+    telescope: (o) => placeNewFurniture([null, o, null, null]),
+    armchair: (o) => placeNewFurniture([null, null, o, null]),
+    typewriter: (o) => placeNewFurniture([null, null, null, o])
+  };
+  for (const o of [sofa, fp, shelf, lamp, table, bed])
+    if (o)
+      tame(o, 0.15);
+  await Promise.all(Object.entries(LATER).map(([k, put]) => loadModel(k).then((o) => {
+    if (!o)
+      return;
+    put(o);
+    if (!["cuckoo", "telescope", "armchair", "typewriter"].includes(k))
+      tame(o, 0.15);
+  })));
+  if (location.hash.includes("debug"))
+    document.getElementById("note").textContent = "sky:" + Array.from(skyCanvas.getContext("2d").getImageData(128, 100, 1, 1).data) + " " + Object.entries(props).map(([k, v]) => {
+      const b = new THREE.Box3().setFromObject(v);
+      return k + ":" + b.min.toArray().map((n) => n.toFixed(1)) + "~" + b.max.toArray().map((n) => n.toFixed(1));
+    }).join("  ");
   {
     const cm = location.hash.match(/cam=([-\d.,]+)/);
     if (cm) {
@@ -3922,13 +3968,6 @@ document.getElementById("note").textContent = "喵喵章鱼打盹＝Agent 这会
       if (k === "happy")
         clawd.happyUntil = 1000000000000;
     }
-  }
-  const ld = document.getElementById("load");
-  if (location.hash.includes("shot"))
-    ld.remove();
-  else {
-    ld.style.opacity = 0;
-    setTimeout(() => ld.remove(), 1100);
   }
   if (location.hash.includes("debug"))
     setTimeout(() => {
